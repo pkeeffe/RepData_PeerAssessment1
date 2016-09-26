@@ -1,0 +1,101 @@
+---
+title: 'Reproducible Research: Peer Assessment 1'
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+---
+
+Initially setup our working directory and load the dplyr library.
+
+```{r echo=TRUE, message=FALSE}
+library(dplyr)
+
+setwd("D:/dev/Coursera/assignments/rr_project1/RepData_PeerAssessment1")
+
+```
+
+## Loading and preprocessing the data
+
+The activity file is loaded and processed.
+
+```{r echo=TRUE}
+activity_data = read.csv("data/activity.csv")
+steps_per_day <- group_by(activity_data, date)
+```
+
+
+## What is mean total number of steps taken per day?
+
+The table below shows the total, mean and median per day.
+
+```{r echo=TRUE}
+steps_summary <- summarize(steps_per_day, mean_per_day = mean(steps, na.rm=TRUE), median_per_day = median(steps,na.rm=TRUE), total_per_day = sum(steps))
+print(select(steps_summary,date,mean_per_day,median_per_day,total_per_day),n=100)
+hist(steps_summary$total_per_day)
+```
+
+## What is the average daily activity pattern?
+
+The average daily activity pattern is as follows.
+
+```{r}
+steps_per_interval <- group_by(activity_data, interval)
+interval_avg <- summarize (steps_per_interval, y=mean(steps, na.rm = TRUE))
+plot(interval_avg$interval,interval_avg$y, type="l")
+arrange(interval_avg,desc(y))
+```
+
+835 is the interval with the highest average number of steps across all days.
+
+## Imputing missing values
+
+1. The total number of rows with NAs is as follows...
+
+```{r}
+sum(is.na(activity_data))
+
+```
+
+2. We are going to populate the missing values by giving them the mean of that days intervals
+
+```{r}
+means <- summarize(steps_per_day, avg = mean(steps,na.rm = TRUE))
+means[is.na(means)] = 0
+new_activity_data <- activity_data
+new_activity_data <- merge(new_activity_data,means)
+new_activity_data <- mutate(new_activity_data, steps = ifelse(is.na(steps),avg,steps))
+
+steps_per_day <- group_by(new_activity_data, date)
+steps_summary <- summarize(steps_per_day, mean_per_day = mean(steps, na.rm=TRUE), median_per_day = median(steps,na.rm=TRUE), total_per_day = sum(steps))
+print(select(steps_summary,date,total_per_day),n=100)
+hist(steps_summary$total_per_day)
+
+```
+
+There is no real impact of inputting the missing values to the histogram or table. 
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+There is more activity at the weekend.
+
+```{r}
+
+activity_data <- mutate(activity_data, day = as.factor(
+                                        ifelse(weekdays(as.Date(date))=='Saturday'| weekdays(as.Date(date)) == 'Sunday',
+                                        'Weekend','Weekday')))
+
+weekday_steps <- subset(activity_data,day == 'Weekday')
+weekend_steps <- subset(activity_data,day == 'Weekend')
+
+steps_per_weekday <- group_by(weekday_steps, interval)
+steps_per_weekend <- group_by(weekend_steps, interval)
+
+weekday_summary <- summarize (steps_per_weekday, y=mean(steps, na.rm = TRUE))
+weekend_summary <- summarize (steps_per_weekend, y=mean(steps, na.rm = TRUE))
+
+par(mfrow = c(2, 1), mar = c(5, 4, 2, 1)) 
+plot(weekday_summary$interval,weekday_summary$y, type="l")
+plot(weekend_summary$interval,weekend_summary$y, type="l")
+
+```
